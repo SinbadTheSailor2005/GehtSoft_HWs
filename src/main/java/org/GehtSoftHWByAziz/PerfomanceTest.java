@@ -21,9 +21,9 @@ public class PerfomanceTest {
     String result = String.format(
             """
             %s
-            Add Time: %s
-            Memory taken: %s
-            """, list.getClass(), duration/1_000_000_000.0, memTaken
+            Add Time: %s ms
+            Memory taken: %s mb
+            """, list.getClass(), duration/1_000_000.0, memTaken  / (1024.0 * 1024.0)
     );
     System.out.println(result);
 
@@ -50,9 +50,9 @@ public class PerfomanceTest {
     String result = String.format(
             """
             %s
-            Remove Time: %s
-            Memory taken: %s
-            """, list.getClass(), duration/1_000_000_000.0, memTaken
+            Remove Time: %s ms
+            Memory taken: %s mb
+            """, list.getClass(), duration/1_000_000.0, memTaken  / (1024.0 * 1024.0)
     );
     System.out.println(result);
 
