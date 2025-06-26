@@ -4,6 +4,7 @@ import java.util.*;
 
 public class CustomList<T> implements List<T> {
   private final int GROW_COEFFICIENT = 2;
+  private final int INIT_LENGHT = 3;
   private Object[] data;
   private int headElement;
 
@@ -12,12 +13,14 @@ public class CustomList<T> implements List<T> {
     try {
 
 
-      this.data = new Object[];
+      this.data = new Object[INIT_LENGHT];
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
-
+  public int lenght() {
+    return this.data.length;
+  }
   @Override
   public int size() {
 
@@ -52,7 +55,7 @@ public class CustomList<T> implements List<T> {
     System.arraycopy(this.data, 0, clone, 0, this.size());
     return clone;
   }
-
+  @SuppressWarnings("unchecked")
   @Override
   public <T1> T1[] toArray(T1[] t1s) {
     if (this.size() > t1s.length) {
@@ -77,7 +80,7 @@ public class CustomList<T> implements List<T> {
 
 
   private boolean isSpaceEnough() {
-    return this.size() <= this.data.length;
+    return this.size() < this.data.length;
   }
 
 
@@ -181,6 +184,8 @@ public class CustomList<T> implements List<T> {
   WARNING: if we try to access element that does not exit aka i != [0, size()]
   position, the exception will pop throw up
    */
+
+  @SuppressWarnings("unchecked")
   @Override
   public T get(int i) {
     // Warning: throws IndexOutOfBoundsException exception
@@ -212,12 +217,13 @@ public class CustomList<T> implements List<T> {
   // i -th pos will be collapse
   // i.e. i = 1 =>  [1,2,3] -> [1,3]
   public void shiftLeft(int i) {
-    if (i == 0 || i == this.headElement) return;
+    if (i == this.headElement) return;
     for (int j = i + 1; j < size(); j++) {
       this.data[j - 1] = this.data[j];
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public T remove(int i) {
     Object removedElement = this.data[i];
@@ -259,16 +265,41 @@ public class CustomList<T> implements List<T> {
     return it;
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public List<T> subList(int i1, int i2) {
     // Warning: throws IndexOutOfBoundsException exception
     Objects.checkIndex(i1, size());
     Objects.checkIndex(i2, size() + 1); // i2 is exclusive
-    List<T> subCollection = new ArrayList<T>(i2 - i1 + 1);
+    List<T> subCollection = new ArrayList<>(i2 - i1 + 1);
     for (int i = i1; i < i2; i++) {
       subCollection.add((T)data[i]);
     }
     return subCollection;
+  }
+
+  // hash function was taken from ArrayList implementation
+  public int hashCode() {
+    int hash = 1;
+    for (int i = 0 ; i < this.size(); i ++) {
+
+
+      Object e = this.data[i];
+      hash = 31 * hash + (e == null ? 0 : e.hashCode());
+    }
+    return  hash;
+  }
+  public boolean equals (Object o) {
+    if (this == o) return true;
+    else if (!(o instanceof List<?> list)) return false;
+    else {
+      if (list.size() != this.size()) return  false;
+      for (int i = 0 ; i < this.size(); i ++){
+        if (list.get(i) != this.data[i]) return false;
+      }
+      return true;
+    }
+
   }
 
   private class CustomListIterator implements ListIterator<T> {
@@ -283,6 +314,7 @@ public class CustomList<T> implements List<T> {
       return this.currentPos < size();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public T next() {
       if (!hasNext()) {
@@ -295,9 +327,10 @@ public class CustomList<T> implements List<T> {
 
     @Override
     public boolean hasPrevious() {
-      return this.currentPos >= 0;
+      return this.currentPos > 0;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public T previous() {
       // Warning: if currentPos -1 < 0 ->
@@ -324,7 +357,7 @@ public class CustomList<T> implements List<T> {
 
       if (canRemove) CustomList.this.remove(currentPos);
       else {
-        throw new RuntimeException("Cant use remove() method in Iterator")
+        throw new RuntimeException("Cant use remove() method in Iterator");
       }
       canSet = false;
       canRemove = false;
