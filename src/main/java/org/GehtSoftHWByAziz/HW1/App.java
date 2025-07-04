@@ -1,4 +1,4 @@
-package org.GehtSoftHWByAziz;
+package org.GehtSoftHWByAziz.HW1;
 
 /**
  * Hello world!

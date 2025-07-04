@@ -1,4 +1,4 @@
-package org.GehtSoftHWByAziz;
+package org.GehtSoftHWByAziz.HW1;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -11,7 +11,7 @@ public class AppTest
     extends TestCase
 {
     /**
-     * Create the test case
+     * Create the test cas
      *
      * @param testName name of the test case
      */
