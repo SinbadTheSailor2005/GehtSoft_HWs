@@ -5,10 +5,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.*;
 
 
 /*
-  WARNING: add -ea flag in VM motions!!!
+  WARNING: add -ea flag in VM motions/actions!!!
   Otherwise, assert will not throw exception on failure
  */
 public class TestRunner {
@@ -55,9 +56,9 @@ public class TestRunner {
                            """, packageName);
     System.out.println("Running tests in package classes...");
 
-    int passedTests = 0;
-    int failedTests = 0;
-    long totalExecutionTime = 0;
+    int[] passedTests = new int[]{0};
+    int []failedTests = new int[]{0};
+    long [] totalExecutionTime =new long[] {0};
     int scannedClasses = 0;
     for (var classInstance : classes) {
       try {
@@ -85,53 +86,94 @@ public class TestRunner {
           for (var beforeEachMethod : beforeEachMethods) {
             beforeEachMethod.invoke(obj);
           }
+          Description desc = testMethod.getAnnotation(Description.class);
+          Timeout timeout = testMethod.getAnnotation(Timeout.class);
+          if (desc != null) {
+            System.out.println(desc.value());
+          }
+          if (timeout != null ) {
+            try(
+            ExecutorService exec = Executors.newSingleThreadExecutor();
+            ) {
 
-          long end = 0;
-          long begin = 0;
-          long duration = 0;
-        try {
-          begin = System.nanoTime();
-          testMethod.invoke(obj);
-          end = System.nanoTime();
-          duration = end - begin;
-          totalExecutionTime += duration;
-
-          System.out.printf("""
-                            [PASSED] Test: %s from class: %s 
-                            Duration: %s ms
+              Runnable task = () -> {
+                runTest(testMethod,failedTests,passedTests,
+                        totalExecutionTime,obj,classInstance);
+              };
+              Future<?> future = exec.submit(task);
+              try {
+                future.get(timeout.value(), TimeUnit.MILLISECONDS);
+              } catch (TimeoutException e) {
+                failedTests[0] ++;
+                System.out.printf("""
+                            TIMEOUT EXCEPTION
+                            
                             """, testMethod.getName(),
-                  classInstance.getSimpleName(), duration / 1_000_000.0);
-          passedTests ++; // no exception - passed tests increased
-        }catch (Exception e) {
-          failedTests ++;
-          System.out.printf("""
-                            [FAILED] Test: %s from class: %s 
-                            """, testMethod.getName(),
-                  classInstance.getSimpleName());
-        }
+                        classInstance.getSimpleName());
+              } finally {
+              exec.shutdownNow();
+              }
+            }
+          } else {
+            runTest(testMethod, failedTests, passedTests, totalExecutionTime,
+                    obj, classInstance);
+          }
           for (var afterEachMethod : afterEachMethods) {
             afterEachMethod.invoke(obj);
           }
         }
 
       } catch (Exception e) {
-        // Filtering non-class ofbjects (i.e. annotations, etc.)
+        // Filtering non-class objects (i.e. annotations, etc.)
       }
 
     }
     System.out.println("<<<<<<<<<<<<<<<<<<< STATISTICS>>>>>>>>>>>>>>>>>>>");
     double successRate =
-            (double) passedTests/((double) (passedTests) + (double)failedTests) * 100;
+            (double) passedTests[0]/((double) (passedTests[0]) + (double)failedTests[0]) * 100;
     System.out.printf("""
                       Total tests: %s
                       Passed: %s
                       Failed: %s
                       Success rate: %s %%
                       Total execution time: %s ms
-                      """, failedTests+ passedTests, passedTests, failedTests
+                      """, failedTests[0]+ passedTests[0], passedTests[0],
+            failedTests[0]
             , successRate,
-            totalExecutionTime/ 1_000_000.0);
+            totalExecutionTime[0]/ 1_000_000.0);
   }
+
+  private static void runTest(
+          Method testMethod, int[] failedTests,int[] passedTests,
+          long[] totalExecutionTime, Object obj, Class<?> classInstance) {
+
+    long end = 0;
+    long begin = 0;
+    long duration = 0;
+    try {
+      begin = System.nanoTime();
+      testMethod.invoke(obj);
+      end = System.nanoTime();
+      duration = end - begin;
+      totalExecutionTime[0] += duration;
+
+      System.out.printf("""
+                            [PASSED] Test: %s from class: %s 
+                            Duration: %s ms
+                            
+                            """, testMethod.getName(),
+              classInstance.getSimpleName(), duration / 1_000_000.0);
+      passedTests[0] ++; // no exception - passed tests increased
+    }catch (Exception e) {
+      failedTests[0] ++;
+      System.out.printf("""
+                            [FAILED] Test: %s from class: %s 
+                            
+                            """, testMethod.getName(),
+              classInstance.getSimpleName());
+    }
+  }
+
 
   public static void main(
           String[] args) throws ClassNotFoundException, InvocationTargetException, IllegalAccessException, NoSuchMethodException, InstantiationException {

@@ -5,7 +5,7 @@ import org.GehtSoftHWByAziz.HW2.Reflection.Test;
 public class AnotherBunchOfTests {
   @Test
   void passedTest1() {
-    assert (2!=2);
+    assert (2==2);
   }
 
   @Test
