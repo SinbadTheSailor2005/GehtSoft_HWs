@@ -95,7 +95,6 @@ public class CustomList<T> implements List<T> {
 
   @Override
   public void add(int i, T t) {
-
     if (!isSpaceEnough()) {
       this.grow();
     }

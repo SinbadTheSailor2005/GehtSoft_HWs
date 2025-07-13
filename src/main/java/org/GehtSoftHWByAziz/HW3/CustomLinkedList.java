@@ -16,7 +16,7 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
   public CustomLinkedList() {
 
   }
-  @Override
+
   public CustomLinkedList<T> reversed() {
     var l = new CustomLinkedList<T>();
     Node<T> current = last;
@@ -79,8 +79,23 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
   }
 
   private boolean removeNode(Node<T> n) {
-    n.previous.next = n.next;
-    n.next.previous = n.previous;
+
+    if (n.previous != null && n.next != null) {
+
+      n.previous.next = n.next;
+      n.next.previous = n.previous;
+    } else {
+      if (n.previous == null && n.next != null) {
+        first = n.next;
+
+      } else if (n.next == null && n.previous !=null){
+        last = n.previous;
+      } else {
+        last = null;
+        first = null;
+      }
+    }
+    counter --;
     return true;
   }
   @Override
@@ -193,13 +208,17 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
       i ++;
       current = current.next;
     }
-    return new Object[0];
+    return arr;
   }
 
   @Override
   public <T1> T1[] toArray(T1[] t1s) {
-    if (t1s.length > size()) return  (T1[])toArray();
-
+    if (t1s.length < size()) {
+      t1s = (T1[]) java.lang.reflect.Array.newInstance(
+              t1s.getClass()
+                      .getComponentType(), size()
+      );
+    }
     int i = 0;
     Node<T> current = first;
     while(current != null) {
@@ -340,6 +359,7 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
 
   @Override
   public T get(int i) {
+    Objects.checkIndex(i, size());
     return getNode(i).data;
   }
 
@@ -349,7 +369,6 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
   }
 
   private Node<T> getNode(int i) {
-    Objects.checkIndex(i, size());
     Node<T> current = first;
     for (int j = 0; j < i; j++) {
       current = current.next;
@@ -359,8 +378,7 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
 
   @Override
   public void add(int i, T t) {
-    counter++;
-    Objects.checkIndex(i, size());
+//    Objects.checkIndex(i, size());
     Node<T> insert = new Node<>(t);
     var n = getNode(i);
     if (n != null) {
@@ -368,6 +386,8 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
       insert.previous = n.previous;
       insert.next = n;
       n.previous = insert;
+
+      counter ++;
     } else {
       add(t);
     }
@@ -375,13 +395,8 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
 
   @Override
   public T remove(int i) {
-    Objects.checkIndex(i, size());
     Node<T> delete = getNode(i);
-    delete.previous.next = delete.next;
-    delete.next.previous = delete.previous;
-    delete.next = null;
-    delete.previous = null;
-    counter--;
+    removeNode(delete);
     return delete.data;
   }
 
@@ -405,6 +420,7 @@ public class CustomLinkedList<T> implements List<T>, Deque<T> {
     while (current != null) {
       if (Objects.equals(o, current.data)) last_ind = i;
       i++;
+      current = current.next;
     }
     return last_ind;
   }

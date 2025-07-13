@@ -1,5 +1,7 @@
 package org.GehtSoftHWByAziz.HW1;
 
+import org.GehtSoftHWByAziz.HW3.CustomLinkedList;
+
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -63,14 +65,16 @@ public class PerfomanceTest {
     var myList = new CustomList<Integer>();
     var linkedList = new LinkedList<Integer>();
     var arrayList = new ArrayList<Integer>();
+    CustomLinkedList<Integer>customLinkedList = new CustomLinkedList<>();
     benchmarkTestAdd(myList);
     benchmarkTestAdd(linkedList);
     benchmarkTestAdd(arrayList);
-
+    benchmarkTestAdd(customLinkedList);
     System.out.println("-----------------------------------------");
 
     benchmarkTestRemove(linkedList);
     benchmarkTestRemove(arrayList);
+    benchmarkTestRemove(customLinkedList);
     benchmarkTestRemove(myList);
   }
 }
