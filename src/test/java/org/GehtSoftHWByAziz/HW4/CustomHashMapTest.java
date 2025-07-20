@@ -57,7 +57,6 @@ public class CustomHashMapTest {
     for (int i = 0; i < 100; i++) {
       m.put(i,i);
     }
-    assertTrue(true);
     assertEquals(99, m.get(99));
     assertEquals(100, m.size());
   }
