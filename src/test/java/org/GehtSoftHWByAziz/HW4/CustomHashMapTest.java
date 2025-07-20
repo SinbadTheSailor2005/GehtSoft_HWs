@@ -34,4 +34,31 @@ public class CustomHashMapTest {
     assertTrue(m.isEmpty());
     assertEquals(0, m.size());
   }
+
+  @Test
+  void testPutAll() {
+    var map = new HashMap<Integer,Integer>();
+    map.put(1,1);
+    map.put(2,2);
+    m.putAll(map);
+    assertEquals(1,m.get(1));
+    assertEquals(2,m.get(2));
+  }
+
+  @Test
+  void testContains() {
+    m.put(1,1);
+    assertTrue(m.containsKey(1));
+    assertTrue(m.containsValue(1));
+  }
+
+  @Test
+  void testGrow() {
+    for (int i = 0; i < 100; i++) {
+      m.put(i,i);
+    }
+    assertTrue(true);
+    assertEquals(99, m.get(99));
+    assertEquals(100, m.size());
+  }
 }
