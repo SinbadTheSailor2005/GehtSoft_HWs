@@ -64,7 +64,7 @@ public class Multithreaded_Performance {
     var threadCounts = new ArrayList<Integer>(List.of(1, 10, 100, 1000));
     try (FileWriter writer = new FileWriter(
             "src/main/java/org/GehtSoftHWByAziz/HW5/Task1/multithread_perfomance.txt", false)) {
-      writer.write(System.getProperty("user.dir")+"sumWithParallelStream\n");
+      writer.write("sumWithParallelStream\n");
       for (int c : threadCounts) {
 
         writer.write("ThreadCounter: " + c + '\n');
