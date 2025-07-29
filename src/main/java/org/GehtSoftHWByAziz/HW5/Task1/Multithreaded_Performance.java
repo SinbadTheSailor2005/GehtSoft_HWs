@@ -16,11 +16,10 @@ public class Multithreaded_Performance {
   public static long sumWithParallelStream(int threadsCount) {
 
     try (ForkJoinPool executor = new ForkJoinPool(threadsCount)) {
-      return executor.submit(() ->
-                      IntStream.range(0, arr.length)
-                              .parallel()
-                              .mapToLong(i -> (long) arr[i])
-                              .sum())
+      return executor.submit(() -> IntStream.range(0, arr.length)
+                      .parallel()
+                      .mapToLong(i -> (long) arr[i])
+                      .sum())
               .get();
 
     } catch (ExecutionException | InterruptedException e) {
@@ -34,14 +33,16 @@ public class Multithreaded_Performance {
     int from = 0;
     int to = Math.min(arr.length, parts);
     for (int i = 0; i < parts; i++) {
+      // posssibly copyng is not the best option
       subArrays.add(Arrays.copyOfRange(arr, from, to));
       from = to;
       to = Math.min(to + parts, arr.length);
     }
     List<FutureTask<Long>> res = new ArrayList<>();
-
     for (int i = 0; i < threadsCount; i++) {
       SumSubarray task = new SumSubarray(subArrays.get(i));
+      // Thread accepts
+      // only Runnable, we need to wrap Callable tasks
       FutureTask<Long> adapter = new FutureTask<>(task);
       new Thread(adapter).start();
       res.add(adapter);
@@ -63,7 +64,8 @@ public class Multithreaded_Performance {
     Arrays.fill(arr, (short) 1);
     var threadCounts = new ArrayList<Integer>(List.of(1, 10, 100, 1000));
     try (FileWriter writer = new FileWriter(
-            "src/main/java/org/GehtSoftHWByAziz/HW5/Task1/multithread_perfomance.txt", false)) {
+            "src/main/java/org/GehtSoftHWByAziz/HW5/Task1/multithread_perfomance.txt",
+            false)) {
       writer.write("sumWithParallelStream\n");
       for (int c : threadCounts) {
 

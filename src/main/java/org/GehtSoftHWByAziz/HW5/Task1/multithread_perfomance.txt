@@ -1,19 +1,19 @@
-/home/aziz/Projects/GehtSoft_HWssumWithParallelStream
+sumWithParallelStream
 ThreadCounter: 1
-Time: 36ms
+Time: 40ms
 ThreadCounter: 10
 Time: 8ms
 ThreadCounter: 100
-Time: 17ms
+Time: 16ms
 ThreadCounter: 1000
-Time: 134ms
+Time: 177ms
 -------------------------------------------
 sumWithParallelThreads
 ThreadCounter: 1
-Time: 2376ms
+Time: 2262ms
 ThreadCounter: 10
-Time: 348ms
+Time: 358ms
 ThreadCounter: 100
-Time: 48ms
+Time: 156ms
 ThreadCounter: 1000
-Time: 203ms
+Time: 140ms
