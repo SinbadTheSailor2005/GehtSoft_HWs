@@ -6,25 +6,30 @@ import java.util.concurrent.*;
 public class CustomExecutorService implements ExecutorService{
   private final int poolSize;
   private final boolean useVirtualThreads;
-  private final Deque<FutureTask<?>> tasks;
-  private final List<Thread> pool;
-  public CustomExecutorService(int poolSize, boolean useVirtualThreads
+  private final BlockingDeque<Runnable> tasks;
+  private final List<Thread> threads;
+  private CustomExecutorService(int poolSize, boolean useVirtualThreads
                                ) {
     this.poolSize = poolSize;
+    this.threads  = new ArrayList<>();
     this.useVirtualThreads = useVirtualThreads;
-    this.tasks = new ArrayDeque<>();
-    if (useVirtualThreads)
-    this.pool = fillThreadPoolWithVirtualThreads(poolSize);
-    else {
-      this.pool = fillThreadPoolWithPlatformThreads(poolSize);
+    this.tasks = new LinkedBlockingDeque<>();
+    runWorkers(poolSize);
+  }
+
+  private void runWorkers(int poolSize) {
+    for (int i = 0 ; i < poolSize; i ++) {
+      Thread t = new Thread(new Worker ());
+      t.start();
+      this.threads.add(t);
     }
   }
 
-  private List<Thread> fillThreadPoolWithPlatformThreads(int poolSize) {
-    List<Thread> threads = new ArrayList<>();
-    for (int i = 0 ; i < poolSize; i ++) {
-      threads.add(new Thread());
-    }
+  public static CustomExecutorService newCustomPlatformThreadPool(int poolSize) {
+    return new CustomExecutorService(poolSize, false);
+  }
+  public static CustomExecutorService newCustomVirtualThreadPool() {
+    return new CustomExecutorService(0, true);
   }
 
   private List<Thread> fillThreadPoolWithVirtualThreads(int poolSize) {
@@ -103,4 +108,23 @@ public class CustomExecutorService implements ExecutorService{
   public void execute(Runnable runnable) {
 
   }
+  private class Worker implements Runnable {
+
+    @Override
+    public void run() {
+
+      while (!CustomExecutorService.this.isShutdown()) {
+        try {
+          var task = tasks.poll(1, TimeUnit.SECONDS); // avoid busy waiting
+          if (task != null) {
+            task.run();
+          }
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    }
+  }
+
+
 }
