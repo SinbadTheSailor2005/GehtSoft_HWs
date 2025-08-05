@@ -85,6 +85,7 @@ public class CustomExecutorService implements ExecutorService {
           long timeout,
           TimeUnit timeUnit) throws InterruptedException {
     long nanos = timeUnit.toNanos(timeout);
+    // used lock to make condition check and
     lock.lock();
     try {
       while (!isTerminated) {
@@ -93,6 +94,7 @@ public class CustomExecutorService implements ExecutorService {
         }
         // if time is out
         // returns value <=0
+        // if condition is met then isTerminated is set to true
         nanos = terminationCondition.awaitNanos(nanos);
       }
       return true;
@@ -103,43 +105,105 @@ public class CustomExecutorService implements ExecutorService {
 
   @Override
   public <T> Future<T> submit(Callable<T> callable) {
-    return null;
+    // RunnableFuture<T> implements RUNNABLE and FUTURE
+    RunnableFuture<T> ftask = new FutureTask<>(callable);
+    execute(ftask);
+    return ftask;
   }
 
   @Override
   public <T> Future<T> submit(Runnable runnable, T t) {
-    return null;
+    RunnableFuture<T>ftask = new FutureTask<>(runnable, t);
+    execute(ftask);
+    return ftask;
   }
 
   @Override
   public Future<?> submit(Runnable runnable) {
-    return null;
+    RunnableFuture<Void> ftask = new FutureTask<>(runnable, null);
+    execute(ftask);
+    return ftask;
   }
 
   @Override
   public <T> List<Future<T>> invokeAll(
           Collection<? extends Callable<T>> collection) throws InterruptedException {
-    return List.of();
+    List<Future<T>> tasks = new ArrayList<>();
+    for (var task : collection) {
+      var future = submit(task);
+        tasks.add(future);
+    }
+    for (var future : tasks) {
+      try {
+        future.get();
+      } catch (ExecutionException e) {
+
+      }
+    }
+    return tasks;
   }
 
   @Override
   public <T> List<Future<T>> invokeAll(
           Collection<? extends Callable<T>> collection, long l,
           TimeUnit timeUnit) throws InterruptedException {
-    return List.of();
+    long nanos = timeUnit.toNanos(l);
+    long end  = System.nanoTime() + nanos;
+    List<Future<T>> tasks = new ArrayList<>();
+    for (var task : collection) {
+      var future = submit(task);
+      tasks.add(future);
+    }
+    for (var future : tasks) {
+      try {
+        future.get( end - System.nanoTime(), TimeUnit.NANOSECONDS);
+      } catch (ExecutionException e) {
+      } catch (TimeoutException e) {
+        return tasks;
+      }
+      return tasks;
+      }
+    return tasks;
   }
 
   @Override
   public <T> T invokeAny(
           Collection<? extends Callable<T>> collection) throws InterruptedException, ExecutionException {
-    return null;
+    List<Future<T>> tasks = new ArrayList<>();
+    for (var task : collection) {
+      var future = submit(task);
+      tasks.add(future);
+    }
+    while (true) {
+      for (var future : tasks) {
+        if (future.isDone()) {
+          return future.get();
+        }
+      }
+    }
   }
 
   @Override
   public <T> T invokeAny(
-          Collection<? extends Callable<T>> collection, long l,
+          Collection<? extends Callable<T>> collection, long timeOut,
           TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
-    return null;
+    long nanos = timeUnit.toNanos(timeOut);
+    long end = System.nanoTime() + nanos;
+    List<Future<T>> tasks = new ArrayList<>();
+    for (var task : collection) {
+        var future = submit(task);
+        tasks.add(future);
+    }
+    while (true) {
+      for (var future : tasks) {
+        if (future.isDone()) {
+            return future.get();
+        }
+        if (end - System.nanoTime() <= 0) {
+            throw new TimeoutException("Time is out");
+        }
+      }
+    }
   }
 
   @Override
