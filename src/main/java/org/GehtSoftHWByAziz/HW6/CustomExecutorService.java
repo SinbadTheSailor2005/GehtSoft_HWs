@@ -1,7 +1,11 @@
 package org.GehtSoftHWByAziz.HW6;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class CustomExecutorService implements ExecutorService {
   private final int poolSize;
@@ -9,7 +13,9 @@ public class CustomExecutorService implements ExecutorService {
   private final BlockingDeque<Runnable> tasks;
   private final List<Thread> threads;
   private boolean isShutdowned = false;
-
+  private boolean isTerminated = false;
+  private final ReentrantLock lock = new ReentrantLock();
+  private final Condition terminationCondition = lock.newCondition();
 
   private CustomExecutorService(int poolSize, boolean useVirtualThreads
   ) {
@@ -45,10 +51,11 @@ public class CustomExecutorService implements ExecutorService {
   @Override
   public List<Runnable> shutdownNow() {
     shutdown();
-    for (var thread: threads){
+    for (var thread : threads) {
       thread.interrupt();
     }
-    List <Runnable> t = new ArrayList<>(this.tasks.stream().toList());
+    List<Runnable> t = new ArrayList<>(this.tasks.stream()
+            .toList());
     tasks.clear();
     return t;
   }
@@ -60,7 +67,7 @@ public class CustomExecutorService implements ExecutorService {
 
   @Override
   public boolean isTerminated() {
-    return false;
+    return this.isTerminated;
   }
 
   @Override
@@ -75,9 +82,23 @@ public class CustomExecutorService implements ExecutorService {
     * Condition for stopping awaitTermination
   * */
   public boolean awaitTermination(
-          long l,
+          long timeout,
           TimeUnit timeUnit) throws InterruptedException {
-    return false;
+    long nanos = timeUnit.toNanos(timeout);
+    lock.lock();
+    try {
+      while (!isTerminated) {
+        if (nanos <= 0) {
+          return false;
+        }
+        // if time is out
+        // returns value <=0
+        nanos = terminationCondition.awaitNanos(nanos);
+      }
+      return true;
+    } finally {
+      lock.unlock();
+    }
   }
 
   @Override
@@ -143,16 +164,31 @@ public class CustomExecutorService implements ExecutorService {
 
     @Override
     public void run() {
-
-      while (!Thread.currentThread().isInterrupted()) {
-        try {
-          var task = tasks.poll(1, TimeUnit.SECONDS); // avoid busy waiting
-          if (task != null) {
-            task.run();
+      try {
+        while (!Thread.currentThread()
+                .isInterrupted() || !(isShutdown() && tasks.isEmpty())) {
+          try {
+            var task = tasks.poll(1, TimeUnit.SECONDS); // avoid busy waiting
+            if (task != null) {
+              task.run();
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread()
+                    .interrupt(); // the flag "interrupted" was
+            // reset during exception
           }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt(); // the flag "interrupted" was
-                                              // reset during exception
+        }
+
+      } finally {
+        lock.lock();
+        try {
+          threads.remove(Thread.currentThread());
+          if (threads.isEmpty() && isShutdowned) {
+            isTerminated = true;
+            terminationCondition.signalAll();
+          }
+        } finally {
+          lock.unlock();
         }
       }
     }
