@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -12,10 +13,12 @@ public class CustomExecutorService implements ExecutorService {
   private final boolean useVirtualThreads;
   private final BlockingDeque<Runnable> tasks;
   private final List<Thread> threads;
-  private boolean isShutdowned = false;
-  private boolean isTerminated = false;
+  private volatile boolean isShutdowned = false;
+  private volatile boolean isTerminated = false;
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition terminationCondition = lock.newCondition();
+  private final AtomicInteger virtualTasks = new AtomicInteger(0);
+  private final List<Thread> virtualThreads = new ArrayList<>();
 
   private CustomExecutorService(int poolSize, boolean useVirtualThreads
   ) {
@@ -23,7 +26,8 @@ public class CustomExecutorService implements ExecutorService {
     this.threads = new ArrayList<>();
     this.useVirtualThreads = useVirtualThreads;
     this.tasks = new LinkedBlockingDeque<>();
-    runWorkers(poolSize);
+    if (!useVirtualThreads)
+      runWorkers(poolSize);
   }
 
   private void runWorkers(int poolSize) {
@@ -71,24 +75,25 @@ public class CustomExecutorService implements ExecutorService {
   }
 
   @Override
-  /*
-  * need rework Worker to somehow
-  * terminate ic case there are no more tasks
-  * so, it the method will busy waiting for
-  * specific state
-  * use
-  * private final ReentrantLock lock = new ReentrantLock();
-    private final Condition terminationCondition = lock.newCondition();
-    * Condition for stopping awaitTermination
-  * */
   public boolean awaitTermination(
           long timeout,
           TimeUnit timeUnit) throws InterruptedException {
+    long millis = timeUnit.toMillis(timeout);
     long nanos = timeUnit.toNanos(timeout);
     // used lock to make condition check and
+    if (useVirtualThreads) {
+      Thread.sleep(millis);
+      if (checkTermination()) {
+        return true;
+      } else {
+        return false;
+      }
+    }
     lock.lock();
     try {
-      while (!isTerminated) {
+      while (!isTerminated) { // защита от ложного пробуждения
+//        A thread can also wake up without being notified, interrupted, or "
+//                timing out, a so-called spurious wakeup.
         if (nanos <= 0) {
           return false;
         }
@@ -107,13 +112,14 @@ public class CustomExecutorService implements ExecutorService {
   public <T> Future<T> submit(Callable<T> callable) {
     // RunnableFuture<T> implements RUNNABLE and FUTURE
     RunnableFuture<T> ftask = new FutureTask<>(callable);
+
     execute(ftask);
     return ftask;
   }
 
   @Override
   public <T> Future<T> submit(Runnable runnable, T t) {
-    RunnableFuture<T>ftask = new FutureTask<>(runnable, t);
+    RunnableFuture<T> ftask = new FutureTask<>(runnable, t);
     execute(ftask);
     return ftask;
   }
@@ -131,7 +137,7 @@ public class CustomExecutorService implements ExecutorService {
     List<Future<T>> tasks = new ArrayList<>();
     for (var task : collection) {
       var future = submit(task);
-        tasks.add(future);
+      tasks.add(future);
     }
     for (var future : tasks) {
       try {
@@ -148,7 +154,7 @@ public class CustomExecutorService implements ExecutorService {
           Collection<? extends Callable<T>> collection, long l,
           TimeUnit timeUnit) throws InterruptedException {
     long nanos = timeUnit.toNanos(l);
-    long end  = System.nanoTime() + nanos;
+    long end = System.nanoTime() + nanos;
     List<Future<T>> tasks = new ArrayList<>();
     for (var task : collection) {
       var future = submit(task);
@@ -156,13 +162,13 @@ public class CustomExecutorService implements ExecutorService {
     }
     for (var future : tasks) {
       try {
-        future.get( end - System.nanoTime(), TimeUnit.NANOSECONDS);
+        future.get(end - System.nanoTime(), TimeUnit.NANOSECONDS);
       } catch (ExecutionException e) {
       } catch (TimeoutException e) {
         return tasks;
       }
       return tasks;
-      }
+    }
     return tasks;
   }
 
@@ -191,16 +197,16 @@ public class CustomExecutorService implements ExecutorService {
     long end = System.nanoTime() + nanos;
     List<Future<T>> tasks = new ArrayList<>();
     for (var task : collection) {
-        var future = submit(task);
-        tasks.add(future);
+      var future = submit(task);
+      tasks.add(future);
     }
     while (true) {
       for (var future : tasks) {
         if (future.isDone()) {
-            return future.get();
+          return future.get();
         }
         if (end - System.nanoTime() <= 0) {
-            throw new TimeoutException("Time is out");
+          throw new TimeoutException("Time is out");
         }
       }
     }
@@ -213,8 +219,14 @@ public class CustomExecutorService implements ExecutorService {
               "tasks");
     }
     if (this.useVirtualThreads) {
-      Thread.ofVirtual()
-              .start(task);
+      Thread t = Thread.ofVirtual()
+              .unstarted(task);
+      try {
+        virtualTasks.incrementAndGet();
+        t.start();
+      } finally {
+        virtualTasks.decrementAndGet();
+      }
     } else {
       try {
         this.tasks.offer(task, 1, TimeUnit.SECONDS);
@@ -224,13 +236,29 @@ public class CustomExecutorService implements ExecutorService {
     }
   }
 
+  private boolean checkTermination() {
+    if (virtualTasks.get() == 0 && isShutdowned) {
+      lock.lock();
+      try {
+        isTerminated = true;
+        return true;
+      } finally {
+        lock.unlock();
+      }
+    }
+    return false;
+  }
+
   private class Worker implements Runnable {
 
     @Override
     public void run() {
       try {
+        // first condition for shutdownNow,
+        // second for shutdown, since after all tasks are done
+        // the thread should be terminated
         while (!Thread.currentThread()
-                .isInterrupted() || !(isShutdown() && tasks.isEmpty())) {
+                .isInterrupted() && !(isShutdown() && tasks.isEmpty())) {
           try {
             var task = tasks.poll(1, TimeUnit.SECONDS); // avoid busy waiting
             if (task != null) {
