@@ -2,6 +2,7 @@ package org.GehtSoftHWByAziz.HW6;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -18,7 +19,7 @@ public class CustomExecutorService implements ExecutorService {
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition terminationCondition = lock.newCondition();
   private final AtomicInteger virtualTasks = new AtomicInteger(0);
-  private final List<Thread> virtualThreads = new ArrayList<>();
+  private final List<Thread> virtualThreads = new LinkedList<>();
 
   private CustomExecutorService(int poolSize, boolean useVirtualThreads
   ) {
@@ -219,14 +220,19 @@ public class CustomExecutorService implements ExecutorService {
               "tasks");
     }
     if (this.useVirtualThreads) {
+      Runnable taskWrapper = () -> {
+        try {
+          task.run();
+
+        } finally {
+
+          virtualTasks.decrementAndGet();
+        }
+      };
       Thread t = Thread.ofVirtual()
-              .unstarted(task);
-      try {
-        virtualTasks.incrementAndGet();
-        t.start();
-      } finally {
-        virtualTasks.decrementAndGet();
-      }
+              .unstarted(taskWrapper);
+      virtualTasks.incrementAndGet();
+      t.start();
     } else {
       try {
         this.tasks.offer(task, 1, TimeUnit.SECONDS);
