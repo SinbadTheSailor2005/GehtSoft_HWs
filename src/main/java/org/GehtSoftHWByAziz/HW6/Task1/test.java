@@ -1,6 +1,5 @@
-package org.GehtSoftHWByAziz.HW6;
+package org.GehtSoftHWByAziz.HW6.Task1;
 
-import javax.swing.plaf.IconUIResource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;

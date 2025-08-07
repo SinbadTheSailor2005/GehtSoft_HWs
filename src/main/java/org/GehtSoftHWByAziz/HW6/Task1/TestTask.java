@@ -1,4 +1,4 @@
-package org.GehtSoftHWByAziz.HW6;
+package org.GehtSoftHWByAziz.HW6.Task1;
 
 public class TestTask implements Runnable{
   @Override
