@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class CustomWebServer {
   private final int port;
@@ -19,7 +21,7 @@ public class CustomWebServer {
   private ServerSocket serverSocket;
   private volatile boolean running = false;
   private final long startTime = System.currentTimeMillis();
-  private final long totalRequests = 0;
+  private final AtomicLong totalRequests = new AtomicLong(0);
 
   public CustomWebServer(
           int port, int threadPoolSize,
@@ -33,104 +35,138 @@ public class CustomWebServer {
   }
 
   public void start() throws IOException {
-    // TODO: Implement server startup logic
     serverSocket = new ServerSocket(port);
-    while (true) {
-      Socket clientSocket = serverSocket.accept();
-      Thread.ofVirtual()
-              .start(() -> {
-                try {
-                  handleClient(clientSocket);
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
-                }
-              });
-      handleClient(clientSocket);
+    running = true;
+    System.out.println("Creating server on localhost on port " + port);
+    while (running) {
+      try {
+        Socket clientSocket = serverSocket.accept();
+        totalRequests.incrementAndGet();
+        executor.submit(() -> {
+          try (Socket socket = clientSocket) {
+            System.out.println("Start handling client request....");
+            handleClient(socket);
+          } catch (IOException e) {
+            if (running) {
+              e.printStackTrace();
+            }
+          }
+        });
+      } catch (IOException e) {
+        if (!running) {
+          System.out.println("Server on port " + port + " stopped.");
+        } else {
+          System.err.println("Error accepting client connection: " + e.getMessage());
+        }
+      }
     }
   }
 
 
-  public void stop() throws IOException {
-    serverSocket.close();
+  public void stop() {
     running = false;
+    try {
+      if (serverSocket != null && !serverSocket.isClosed()) {
+        serverSocket.close();
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      executor.shutdownNow();
+    }
   }
 
   private String getRequestLine(BufferedReader in) throws IOException {
-    // Warning: the request should not start with empty lines
-    String l;
-    l = in.readLine()
-            .trim();
+    String l = in.readLine();
+    if (l != null) {
+      l = l.trim();
+    }
+    System.out.println("Got requested line: " + l);
     return l;
   }
 
   private Map<String, String> getHeaders(BufferedReader in) throws IOException {
-    String l = "";
+    String l;
     Map<String, String> headers = new HashMap<>();
     System.out.println("Start parsing headers");
     while ((l = in.readLine()) != null && !l.isEmpty()) {
       l = l.trim();
       String[] parts = l.split(": ", 2);
-      String key = parts[0];
-      String value = parts[1];
-      headers.put(key, value);
-      System.out.println("Header: " + key + " = " + value);
+      if (parts.length == 2) {
+        String key = parts[0];
+        String value = parts[1];
+        headers.put(key, value);
+        System.out.println("Header: " + key + " = " + value);
+      }
     }
     return headers;
   }
 
-  private String getBody(BufferedReader in) throws IOException {
-    StringBuilder body = new StringBuilder();
-    String line;
-    while ((line = in.readLine()) != null) {
-      body.append(line)
-              .append("\n");
+  private String getBody(BufferedReader in, Map<String, String> headers) throws IOException {
+    String contentLengthHeader = headers.get("Content-Length");
+    if (contentLengthHeader == null) {
+      return "";
     }
-    return body.toString()
-            .trim();
+    int contentLength = Integer.parseInt(contentLengthHeader.trim());
+    if (contentLength == 0) {
+      return "";
+    }
+    System.out.println("Start parsing body...");
+    char[] bodyChars = new char[contentLength];
+    int bytesRead = in.read(bodyChars, 0, contentLength); //TODO: разобраться
+    // с этим...
+    String body = new String(bodyChars, 0, bytesRead);
+    System.out.println("Got body: " + body);
+    return body;
   }
 
   private void handleClient(Socket clientSocket) throws IOException {
-    // TODO: Handle individual client requests
     BufferedReader in =
             new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
     PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
     String requestLine = getRequestLine(in);
+    if (requestLine == null || requestLine.isEmpty()) {
+      return;
+    }
     System.out.println("Request line: " + requestLine);
     String[] requestLineParts = requestLine.split(" ");
     String method = requestLineParts[0];
     String requestedResource = requestLineParts[1];
     String version = requestLineParts[2];
     Map<String, String> headers = getHeaders(in);
-    String body = getBody(in);
+    String body = "";
+    if (method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("POST")) {
+      body = getBody(in, headers);
+    }
     processRequest(method, requestedResource, out, version, headers, body);
-    clientSocket.close();
-    in.close();
-    out.close();
   }
 
   private void processRequest(
           String method, String requestedResource,
           PrintWriter out, String version, Map<String, String> headers,
-          String body) throws IOException {
+          String body) {
     if (method.equals("GET")) {
       if (requestedResource.equals("/")) {
-
         try {
-
-
-          String responseBode = Files.readString(Path.of("./static/index" +
-                  ".html"));
+          String responseBody = Files.readString(Path.of("./static/index.html"));
           out.println(version + " 200 OK");
+          out.println("Content-Type: text/html");
+          out.println("Content-Length: " + responseBody.getBytes().length);
           out.println();
-          out.println(responseBode);
+          out.println(responseBody);
         } catch (IOException e) {
           out.println(version + " 404 Not Found");
           out.println();
           out.println("Resource not found");
         }
-      }
-      if (requestedResource.startsWith("/static/")) {
+      } else if (requestedResource.startsWith("/static/")) {
         Path path = Path.of("." + requestedResource);
         try {
           String responseBody = Files.readString(path);
@@ -142,56 +178,40 @@ public class CustomWebServer {
           out.println();
           out.println("Resource not found");
         }
-      }
-      if (requestedResource.equals("/api/time")) {
-        try {
-          out.println(version + "200 OK");
-          out.println();
-          out.println("Current time: " + System.currentTimeMillis());
-        } catch (Exception e) {
-          out.println(version + " 500 Internal Server Error");
-          out.println();
-          out.println("Internal server error");
-        }
-      }
-      if (requestedResource.equals("api/stats")) {
-        try {
-          out.println(version + " 200 OK");
-          out.println();
-          out.println("Server started at: " + startTime);
-          out.println("Total requests: " + totalRequests);
-        } catch (Exception e) {
-            out.println(version + " 500 Internal Server Error");
-            out.println();
-            out.println("Internal server error");
-        }
+      } else if (requestedResource.equals("/api/time")) {
+        String responseBody = "Current time: " + System.currentTimeMillis();
+        out.println(version + " 200 OK");
+        out.println("Content-Length: " + responseBody.getBytes().length);
+        out.println();
+        out.println(responseBody);
+      } else if (requestedResource.equals("/api/stats")) {
+        String responseBody = "Server started at: " + startTime + "\n" +
+                "Total requests: " + totalRequests.get();
+        out.println(version + " 200 OK");
+        out.println("Content-Length: " + responseBody.getBytes().length);
+        out.println();
+        out.println(responseBody);
       } else {
         out.println(version + " 404 Not Found");
         out.println();
         out.println("Resource not found");
       }
-    }
-    if (method.equals("POST")) {
+    } else if (method.equals("POST")) {
       if (requestedResource.equals("/api/echo")) {
-        try {
-          out.println("" + version + " 200 OK");
-          out.println();
-          out.println("Echo: " + body);
-        }catch (Exception e) {
-            out.println(version + " 500 Internal Server Error");
-            out.println();
-            out.println("Internal server error");
-        }
+        String responseBody = "Echo: " + body;
+        out.println(version + " 200 OK");
+        out.println("Content-Length: " + responseBody.getBytes().length);
+        out.println();
+        out.println(responseBody);
       } else {
         out.println(version + " 404 Not Found");
         out.println();
         out.println("Resource not found");
       }
-    }else
+    } else {
       out.println(version + " 405 Method Not Allowed");
       out.println();
       out.println("Method not allowed");
-
+    }
   }
 }
-
