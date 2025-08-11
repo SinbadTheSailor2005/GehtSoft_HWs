@@ -12,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class CustomWebServer {
@@ -43,12 +42,19 @@ public class CustomWebServer {
         Socket clientSocket = serverSocket.accept();
         totalRequests.incrementAndGet();
         executor.submit(() -> {
-          try (Socket socket = clientSocket) {
+          try {
             System.out.println("Start handling client request....");
-            handleClient(socket);
-          } catch (IOException e) {
+            handleClient(clientSocket);
+
+          } catch (IOException | InterruptedException e) {
             if (running) {
               e.printStackTrace();
+            }
+          } finally {
+            try {
+              clientSocket.close();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
             }
           }
         });
@@ -56,7 +62,8 @@ public class CustomWebServer {
         if (!running) {
           System.out.println("Server on port " + port + " stopped.");
         } else {
-          System.err.println("Error accepting client connection: " + e.getMessage());
+          System.err.println(
+                  "Error accepting client connection: " + e.getMessage());
         }
       }
     }
@@ -73,13 +80,7 @@ public class CustomWebServer {
       e.printStackTrace();
     }
     executor.shutdown();
-    try {
-      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-        executor.shutdownNow();
-      }
-    } catch (InterruptedException e) {
-      executor.shutdownNow();
-    }
+
   }
 
   private String getRequestLine(BufferedReader in) throws IOException {
@@ -108,25 +109,27 @@ public class CustomWebServer {
     return headers;
   }
 
-  private String getBody(BufferedReader in, Map<String, String> headers) throws IOException {
+  private String getBody(
+          BufferedReader in,
+          Map<String, String> headers) throws IOException, InterruptedException {
     String contentLengthHeader = headers.get("Content-Length");
-    if (contentLengthHeader == null) {
-      return "";
-    }
     int contentLength = Integer.parseInt(contentLengthHeader.trim());
-    if (contentLength == 0) {
-      return "";
-    }
-    System.out.println("Start parsing body...");
-    char[] bodyChars = new char[contentLength];
-    int bytesRead = in.read(bodyChars, 0, contentLength); //TODO: разобраться
-    // с этим...
-    String body = new String(bodyChars, 0, bytesRead);
-    System.out.println("Got body: " + body);
-    return body;
+    Thread.sleep(1000);
+    // Warning: use sleep since not all bytes can arrive simultaneously
+    // use while ?
+    char[] body = new char[contentLength];
+    System.out.println("Start reading body");
+    int readBytes = in.read(body, 0, contentLength);
+    System.out.printf("""
+                      Requested bytes = %s
+                      Received bytes = %s
+                      
+                      """, contentLength, readBytes);
+    String res = new String(body);
+    return res;
   }
 
-  private void handleClient(Socket clientSocket) throws IOException {
+  private void handleClient(Socket clientSocket) throws IOException, InterruptedException {
     BufferedReader in =
             new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
@@ -155,7 +158,8 @@ public class CustomWebServer {
     if (method.equals("GET")) {
       if (requestedResource.equals("/")) {
         try {
-          String responseBody = Files.readString(Path.of("./static/index.html"));
+          String responseBody =
+                  Files.readString(Path.of("./static/index.html"));
           out.println(version + " 200 OK");
           out.println("Content-Type: text/html");
           out.println("Content-Length: " + responseBody.getBytes().length);

@@ -90,10 +90,11 @@ public class Test {
           var response = sendRequest(client, m,
                   HttpResponse.BodyHandlers.ofString());
           printResponse(response);
+          System.out.println("-".repeat(10));
         }
       }
 
-      Thread.sleep(60000); // Run for 1 minute
+      Thread.sleep(6000000); // Run for 1 minute
 
     } catch (Exception e) {
       e.printStackTrace();
