@@ -21,12 +21,28 @@ public class Client {
 
   }
 
-  public static synchronized void transfer(
-    Bank bank, int from, int to, long x) {
-    long balFrom = bank.getAccountBalance(from) - x;
-    bank.setAccountBalance(from, balFrom);
-    long balTo = bank.getAccountBalance(to) + x;
-    bank.setAccountBalance(to, balTo);
+  public static void transfer(
+          Bank bank, int from, int to, long x) {
+    Account acc1 = bank.accounts.get(from);
+    Account acc2 = bank.accounts.get(to);
+    Object obj1, obj2;
+
+    if (from > to) {
+      obj1 = acc1;
+      obj2 = acc2;
+    } else {
+      obj1 = acc2;
+      obj2 = acc1;
+    }
+    synchronized (obj1) {
+      synchronized (obj2) {
+        long balFrom = bank.getAccountBalance(from) - x;
+        bank.setAccountBalance(from, balFrom);
+        long balTo = bank.getAccountBalance(to) + x;
+        bank.setAccountBalance(to, balTo);
+      }
+    }
+
 
   }
 
