@@ -1,0 +1,19 @@
+sumWithParallelStream
+ThreadCounter: 1
+Time: 40ms
+ThreadCounter: 10
+Time: 8ms
+ThreadCounter: 100
+Time: 16ms
+ThreadCounter: 1000
+Time: 177ms
+-------------------------------------------
+sumWithParallelThreads
+ThreadCounter: 1
+Time: 2262ms
+ThreadCounter: 10
+Time: 358ms
+ThreadCounter: 100
+Time: 156ms
+ThreadCounter: 1000
+Time: 140ms
