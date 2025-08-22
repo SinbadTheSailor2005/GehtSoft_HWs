@@ -10,6 +10,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -120,16 +121,19 @@ public class CustomWebServer {
     char[] body = new char[contentLength];
     System.out.println("Start reading body");
     int readBytes = in.read(body, 0, contentLength);
-    System.out.printf("""
-                      Requested bytes = %s
-                      Received bytes = %s
-                      
-                      """, contentLength, readBytes);
+    System.out.printf(
+            """
+            Requested bytes = %s
+            Received bytes = %s
+            
+            """, contentLength, readBytes
+    );
     String res = new String(body);
     return res;
   }
 
-  private void handleClient(Socket clientSocket) throws IOException, InterruptedException {
+  private void handleClient(
+          Socket clientSocket) throws IOException, InterruptedException {
     BufferedReader in =
             new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
@@ -148,13 +152,16 @@ public class CustomWebServer {
     if (method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("POST")) {
       body = getBody(in, headers);
     }
-    processRequest(method, requestedResource, out, version, headers, body);
+    processRequest(
+            method, requestedResource, out, version, headers, body,
+            clientSocket
+    );
   }
 
   private void processRequest(
           String method, String requestedResource,
           PrintWriter out, String version, Map<String, String> headers,
-          String body) {
+          String body, Socket clientsocket) throws IOException {
     if (method.equals("GET")) {
       if (requestedResource.equals("/")) {
         try {
@@ -172,18 +179,29 @@ public class CustomWebServer {
         }
       } else if (requestedResource.startsWith("/static/")) {
         Path path = Path.of("." + requestedResource);
+        byte[] filebytes = Files.readAllBytes(path);
+        // determine MIME type by itself
+        String MIMEType = Files.probeContentType(path);
+        if (MIMEType == null) {
+          MIMEType = "application/octet-stream";
+        }
         try {
-          String responseBody = Files.readString(path);
           out.println(version + " 200 OK");
+          out.println("Content-Type: " + MIMEType);
+          out.println("Content-Length: " + filebytes.length);
           out.println();
-          out.println(responseBody);
+          clientsocket.getOutputStream()
+                  .write(filebytes);
+          clientsocket.getOutputStream()
+                  .flush();
+
         } catch (IOException e) {
           out.println(version + " 404 Not Found");
           out.println();
           out.println("Resource not found");
         }
       } else if (requestedResource.equals("/api/time")) {
-        String responseBody = "Current time: " + System.currentTimeMillis();
+        String responseBody = "Current time: " + LocalTime.now();
         out.println(version + " 200 OK");
         out.println("Content-Length: " + responseBody.getBytes().length);
         out.println();
