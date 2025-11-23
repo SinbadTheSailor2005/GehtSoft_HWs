@@ -9,5 +9,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface CustomRequestMapping {
   String value();
-  HttpMethods method();
+  HttpMethods method() default  HttpMethods.EMPTY;
 }

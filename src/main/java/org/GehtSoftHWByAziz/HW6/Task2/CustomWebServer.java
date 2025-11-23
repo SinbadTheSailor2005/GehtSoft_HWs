@@ -15,12 +15,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class CustomWebServer {
-  private final int port;
-  private final CustomExecutorService executor;
-  private ServerSocket serverSocket;
-  private volatile boolean running = false;
-  private final long startTime = System.currentTimeMillis();
-  private final AtomicLong totalRequests = new AtomicLong(0);
+  protected final int port;
+  protected final CustomExecutorService executor;
+  protected ServerSocket serverSocket;
+  protected volatile boolean running = false;
+  protected final long startTime = System.currentTimeMillis();
+  protected final AtomicLong totalRequests = new AtomicLong(0);
 
   public CustomWebServer(
           int port, int threadPoolSize,
@@ -83,7 +83,7 @@ public class CustomWebServer {
 
   }
 
-  private String getRequestLine(BufferedReader in) throws IOException {
+  protected String getRequestLine(BufferedReader in) throws IOException {
     String l = in.readLine();
     if (l != null) {
       l = l.trim();
@@ -92,7 +92,7 @@ public class CustomWebServer {
     return l;
   }
 
-  private Map<String, String> getHeaders(BufferedReader in) throws IOException {
+  protected Map<String, String> getHeaders(BufferedReader in) throws IOException {
     String l;
     Map<String, String> headers = new HashMap<>();
     System.out.println("Start parsing headers");
@@ -109,7 +109,7 @@ public class CustomWebServer {
     return headers;
   }
 
-  private String getBody(
+  protected String getBody(
           BufferedReader in,
           Map<String, String> headers) throws IOException, InterruptedException {
     String contentLengthHeader = headers.get("Content-Length");
@@ -129,13 +129,14 @@ public class CustomWebServer {
     return res;
   }
 
-  private void handleClient(Socket clientSocket) throws IOException, InterruptedException {
+  protected void handleClient(Socket clientSocket) throws IOException, InterruptedException {
     BufferedReader in =
             new BufferedReader(
                     new InputStreamReader(clientSocket.getInputStream()));
     PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
     String requestLine = getRequestLine(in);
     if (requestLine == null || requestLine.isEmpty()) {
+      System.out.println("Empty request line... returning");
       return;
     }
     System.out.println("Request line: " + requestLine);
@@ -151,7 +152,7 @@ public class CustomWebServer {
     processRequest(method, requestedResource, out, version, headers, body);
   }
 
-  private void processRequest(
+  protected void processRequest(
           String method, String requestedResource,
           PrintWriter out, String version, Map<String, String> headers,
           String body) {
