@@ -1,0 +1,18 @@
+package org.GehtSoftHWByAziz.HW7.RESTAnnotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Example usage:
+ * @GetMapping("/users/{userId}")
+ *public User getUserById(@PathVariable String userId) {
+ */
+@Target(ElementType.PARAMETER)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface CustomPathVariable {
+  String value();
+}
+
