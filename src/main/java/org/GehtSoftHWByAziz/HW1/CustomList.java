@@ -1,4 +1,4 @@
-package org.GehtSoftHWByAziz;
+package org.GehtSoftHWByAziz.HW1;
 
 import java.util.*;
 
@@ -95,7 +95,6 @@ public class CustomList<T> implements List<T> {
 
   @Override
   public void add(int i, T t) {
-
     if (!isSpaceEnough()) {
       this.grow();
     }

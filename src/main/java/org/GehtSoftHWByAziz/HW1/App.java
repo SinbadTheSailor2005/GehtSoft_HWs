@@ -1,4 +1,6 @@
-package org.GehtSoftHWByAziz;
+package org.GehtSoftHWByAziz.HW1;
+
+import java.util.Objects;
 
 /**
  * Hello world!
@@ -8,6 +10,6 @@ public class App
 {
     public static void main( String[] args )
     {
-        System.out.println( "Hello World!" );
+        Objects.checkIndex(0,0);
     }
 }
